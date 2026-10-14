@@ -1,0 +1,110 @@
+
+name: Build and deploy LingolinKup
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout deployment repository
+        uses: actions/checkout@v4
+
+      - name: Clone original Lovable repository
+        run: |
+          git clone --depth 1 https://github.com/thefurthestbulb/lingolinkup-.git source
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: source
+        run: npm ci
+
+      - name: Build website
+        working-directory: source
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ]; then
+            unset VITE_SUPABASE_URL
+          fi
+          if [ -z "$VITE_SUPABASE_PUBLISHABLE_KEY" ]; then
+            unset VITE_SUPABASE_PUBLISHABLE_KEY
+          fi
+          if [ -z "$VITE_SUPABASE_PROJECT_ID" ]; then
+            unset VITE_SUPABASE_PROJECT_ID
+          fi
+          npm run build
+
+      - name: Prepare published website
+        run: |
+          mkdir -p dist
+          cp -R source/dist/. dist/
+          cp public/CNAME dist/CNAME
+          cp public/404.html dist/404.html
+
+      - name: Restore React Router paths
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          index = Path("dist/index.html")
+          html = index.read_text()
+
+          script = """
+          <script>
+          (function () {
+            var route = sessionStorage.getItem('github-pages-route');
+            if (route) {
+              sessionStorage.removeItem('github-pages-route');
+              history.replaceState(null, '', route);
+            }
+          })();
+          </script>
+          """
+
+          if "</head>" not in html:
+              raise SystemExit("Missing closing head tag")
+
+          html = html.replace("</head>", script + "</head>", 1)
+          index.write_text(html)
+          PY
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
