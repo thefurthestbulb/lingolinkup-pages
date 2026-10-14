@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout deployment repository
-        uses: actions/checkout@
+        uses: actions/checkout@v4
       - name: Clone original Lovable repository
         env:
           SOURCE_REPO_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
