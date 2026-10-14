@@ -21,11 +21,12 @@ jobs:
 
     steps:
       - name: Checkout deployment repository
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@
       - name: Clone original Lovable repository
+        env:
+          SOURCE_REPO_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
         run: |
-          git clone --depth 1 https://github.com/thefurthestbulb/lingolinkup-.git source
+          git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$SOURCE_REPO_TOKEN" | base64 -w 0)" clone --depth 1 https://github.com/thefurthestbulb/lingolinkup-.git source
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
