@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: '22'
 
-      - 
+    
       - name: Install dependencies
         working-directory: source
         run: npm install --no-audit --no-fund
